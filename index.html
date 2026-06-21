@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Distances to Lines v1.6</title>
+<style>
+:root{--bg:#f3f6fa;--card:#fff;--ink:#132233;--muted:#5c6b7a;--line:#d5dee8;--accent:#123b66;--good:#1f7a35;--warn:#c46a00;--bad:#b42318;--soft:#eef3f8}
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--ink)}
+.app{max-width:620px;margin:0 auto;padding:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 6px 18px rgba(0,0,0,.07)}
+h1{margin:0 0 4px;font-size:1.35rem;color:var(--accent)}
+h2{margin:0 0 10px;font-size:1.05rem;color:var(--accent)}
+.sub{color:var(--muted);font-size:.9rem;line-height:1.35}
+button{width:100%;border:0;border-radius:14px;padding:14px;margin-top:10px;font-size:1rem;font-weight:bold;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.btn-primary{background:var(--accent);color:white}.btn-secondary{background:var(--soft);color:var(--accent);border:1px solid #cbd7e4}.btn-good{background:var(--good);color:white}.btn-bad{background:var(--bad);color:white}
+button:disabled{opacity:.55;cursor:not-allowed}
+.status{font-weight:bold;font-size:.95rem;margin-top:8px}.status.good{color:var(--good)}.status.wait{color:var(--warn)}.status.bad{color:var(--bad)}
+.metric{display:grid;grid-template-columns:155px 1fr;gap:8px;padding:8px 0;border-top:1px solid #edf1f5;align-items:center}.metric:first-child{border-top:0}
+.metric-label{color:var(--muted);font-size:.85rem}.metric-value{font-family:"Courier New",monospace;font-weight:bold;font-size:1rem;overflow-wrap:anywhere}
+.big-result{background:#f7fafc;border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:10px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.line-card{border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:8px;background:#fbfdff;border-left:6px solid #cbd7e4}
+.line-card.crossed{border-left-color:var(--good)}.line-card.next{border-left-color:var(--warn)}
+.line-title{font-weight:bold;color:var(--accent);font-size:.98rem;margin-bottom:6px}.small{font-size:.82rem;color:var(--muted);line-height:1.35}
+.result-card{border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;background:#fbfdff;border-left:6px solid #cbd7e4}
+.result-card.waiting{border-left-color:var(--warn)}.result-card.crossed{border-left-color:var(--good)}
+.result-grid{display:grid;grid-template-columns:110px 1fr;gap:6px;border-top:1px solid #edf1f5;padding-top:6px;margin-top:6px}
+.result-k{color:var(--muted);font-size:.8rem}.result-v{font-family:"Courier New",monospace;font-weight:bold;font-size:.9rem;overflow-wrap:anywhere}
+.log{max-height:290px;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:8px;background:#fbfdff;font-family:"Courier New",monospace;font-size:.78rem;white-space:pre-wrap;-webkit-user-select:text;user-select:text}
+.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="card">
+    <h1>Distances to Lines v1.6</h1>
+    <div class="sub">Proof app: lean baseline from v1.3; detect fixed trip-line crossings and capture the driven distance at each line.</div>
+    <div class="sub">Test route: Bluefin line → Ruby Way → 90 Sign.</div>
+  </div>
+
+  <div class="card">
+    <h2>1. GPS / Run Control</h2>
+    <div class="sub">GPS starts when the app opens. Wait for the 60 second GPS warm-up to complete, then start the run before crossing the Bluefin line.</div>
+    <div class="big-result">
+      <div class="metric"><div class="metric-label">GPS status</div><div class="metric-value" id="gpsStatus">starting...</div></div>
+      <div class="metric"><div class="metric-label">GPS ready</div><div class="metric-value" id="gpsReady">No</div></div>
+      <div class="metric"><div class="metric-label">Warm-up remaining</div><div class="metric-value" id="warmupRemaining">60 sec</div></div>
+      <div class="metric"><div class="metric-label">Live accuracy</div><div class="metric-value" id="liveAccuracy">--</div></div>
+      <div class="metric"><div class="metric-label">Live speed</div><div class="metric-value" id="liveSpeed">--</div></div>
+      <div class="metric"><div class="metric-label">Live lat/lon</div><div class="metric-value" id="liveLatLon">--</div></div>
+      <div class="metric"><div class="metric-label">Next line</div><div class="metric-value" id="nextLine">Bluefin line</div></div>
+      <div class="metric"><div class="metric-label">Distance to next line</div><div class="metric-value" id="nextLineDist">--</div></div>
+      <div class="metric"><div class="metric-label">Run distance</div><div class="metric-value" id="runDistance">0.000 km</div></div>
+    </div>
+    <button class="btn-primary" id="startBtn" disabled>Start Run</button>
+    <button class="btn-secondary" id="stopBtn" disabled>Stop Run</button>
+  </div>
+
+  <div class="card">
+    <h2>2. Fixed Test Lines</h2>
+    <div id="lineCards"></div>
+  </div>
+
+  <div class="card">
+    <h2>3. Crossing Results</h2>
+    <div class="sub">The three test lines are shown before the run, so the phone can be used in the field without a laptop. Each row updates as its line is crossed.</div>
+    <div class="big-result">
+      <div class="metric"><div class="metric-label">Crossings</div><div class="metric-value" id="crossingCount">0 / 3</div></div>
+      <div class="metric"><div class="metric-label">Last crossing</div><div class="metric-value" id="lastCrossing">--</div></div>
+      <div class="metric"><div class="metric-label">Total vs expected</div><div class="metric-value" id="totalDiff">--</div></div>
+    </div>
+    <div id="resultCards"></div>
+    <button class="btn-bad" id="resetBtn">Reset Run / Prepare Next Run</button>
+  </div>
+
+  <div class="card">
+    <h2>4. GPS Review Log</h2>
+    <div class="sub">The on-screen log is a short view only. Export the CSV after each run for detailed review.</div>
+    <div class="log" id="screenLog">No run yet.</div>
+    <button class="btn-good" id="exportBtn">Export Run Log CSV</button>
+  </div>
+</div>
+
+<script>
+const APP_VERSION="1.6";
+const GPS_READY_MS=60000;
+const ACC_GOOD_M=8;
+const ACC_LOW_M=15;
+const JITTER_M=1.2;
+const MAX_REASONABLE_KMH=140;
+
+const TEST_LINES=[
+  {id:"bluefin",name:"Bluefin line",expectedKm:0.000,start:{lat:-34.118155,lon:18.382599},end:{lat:-34.118663,lon:18.382819}},
+  {id:"ruby",name:"Ruby Way",expectedKm:4.796,start:{lat:-34.106801,lon:18.396367},end:{lat:-34.107275,lon:18.396055}},
+  {id:"sign90",name:"90 Sign",expectedKm:10.655,start:{lat:-34.135831,lon:18.394561},end:{lat:-34.135699,lon:18.393929}}
+];
+
+let gpsWatchId=null,gpsStartedAt=Date.now(),lastFix=null,lastAccepted=null;
+let runState="idle",recordingActive=false,nextLineIndex=0,totalDistanceM=0,lastAnchorDistanceM=0;
+let crossings=[],logRows=[],screenRows=[];
+
+const $=id=>document.getElementById(id);
+document.addEventListener("contextmenu",e=>e.preventDefault());
+
+function nowString(ms){const d=new Date(ms||Date.now());return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")+":"+String(d.getSeconds()).padStart(2,"0")+"."+String(d.getMilliseconds()).padStart(3,"0")}
+function fmtKm(m){return (m/1000).toFixed(3)+" km"}
+function fmtM(m){return Number.isFinite(m)?m.toFixed(1)+" m":"--"}
+function haversineMeters(a,b){const R=6371000,lat1=a.lat*Math.PI/180,lat2=b.lat*Math.PI/180,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180,x=dLon*Math.cos((lat1+lat2)/2),y=dLat;return Math.sqrt(x*x+y*y)*R}
+function toLocalXY(p,o){const R=6371000,lat0=o.lat*Math.PI/180;return{x:(p.lon-o.lon)*Math.PI/180*Math.cos(lat0)*R,y:(p.lat-o.lat)*Math.PI/180*R}}
+function lineCentre(line){return{lat:(line.start.lat+line.end.lat)/2,lon:(line.start.lon+line.end.lon)/2}}
+function lineLength(line){return haversineMeters(line.start,line.end)}
+function lineSignedDistanceM(p,line){const a=line.start,b=line.end,q=toLocalXY(p,a),v=toLocalXY(b,a),len=Math.sqrt(v.x*v.x+v.y*v.y);if(!len)return NaN;return (v.x*q.y-v.y*q.x)/len}
+function lineAbsDistanceM(p,line){const d=lineSignedDistanceM(p,line);return Number.isFinite(d)?Math.abs(d):NaN}
+function lineProjectionM(p,line){const a=line.start,b=line.end,q=toLocalXY(p,a),v=toLocalXY(b,a),len=Math.sqrt(v.x*v.x+v.y*v.y);if(!len)return NaN;return (q.x*v.x+q.y*v.y)/len}
+function crossingQuality(avgAcc,segM,dtSec){let q=10;if(!Number.isFinite(avgAcc))q-=2;else if(avgAcc>12)q-=3;else if(avgAcc>8)q-=2;else if(avgAcc>5)q-=1;if(segM>35)q-=2;else if(segM>20)q-=1;if(dtSec>3)q-=2;else if(dtSec>1.5)q-=1;return Math.max(1,Math.min(10,Math.round(q)))}
+function gpsReady(){return Date.now()-gpsStartedAt>=GPS_READY_MS && !!lastFix}
+function escapeCsv(v){const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+
+function addScreen(line){screenRows.push(line);if(screenRows.length>60)screenRows.shift();$("screenLog").textContent=screenRows.length?screenRows.join("\n"):"No run yet."}
+function logRow(row){logRows.push(row)}
+
+function renderLines(){const wrap=$("lineCards");wrap.innerHTML="";TEST_LINES.forEach((line,i)=>{const c=crossings.find(x=>x.lineId===line.id);const div=document.createElement("div");div.className="line-card "+(c?"crossed":(i===nextLineIndex?"next":""));let html='<div class="line-title">'+(i+1)+'. '+line.name+'</div>';
+html+='<div class="small">Expected route distance: '+line.expectedKm.toFixed(3)+' km</div>';
+html+='<div class="small">Line length: '+lineLength(line).toFixed(1)+' m</div>';
+if(c){html+='<div class="small good">Crossed at '+fmtKm(c.totalDistanceM)+' | diff '+(c.diffM>=0?'+':'')+c.diffM.toFixed(1)+' m | Q'+c.quality+'</div>';if(i>0)html+='<div class="small">Leg distance: '+fmtKm(c.legDistanceM)+' | expected leg '+(c.expectedLegKm).toFixed(3)+' km | leg diff '+(c.legDiffM>=0?'+':'')+c.legDiffM.toFixed(1)+' m</div>';}else if(i===nextLineIndex){html+='<div class="small warn">Waiting for this line</div>';}else{html+='<div class="small">Not reached</div>';}div.innerHTML=html;wrap.appendChild(div);});
+}
+function renderResultCards(){const wrap=$("resultCards");if(!wrap)return;wrap.innerHTML="";TEST_LINES.forEach((line,i)=>{const c=crossings.find(x=>x.lineId===line.id);const div=document.createElement("div");div.className="result-card "+(c?"crossed":"waiting");let status=c?"CROSSED":(i===nextLineIndex?"WAITING NEXT":"WAITING");let measured=c?fmtKm(c.totalDistanceM):"--";let diff=c?((c.diffM>=0?"+":"")+c.diffM.toFixed(1)+" m"):"--";let quality=c?("Q"+c.quality):"--";let leg="--";if(c&&i>0){leg=fmtKm(c.legDistanceM)+" / diff "+(c.legDiffM>=0?"+":"")+c.legDiffM.toFixed(1)+" m";}else if(i===0){leg="start line";}div.innerHTML='<div class="line-title">'+(i+1)+'. '+line.name+'</div>'+'<div class="result-grid">'+'<div class="result-k">Status</div><div class="result-v '+(c?'good':'warn')+'">'+status+'</div>'+'<div class="result-k">Expected</div><div class="result-v">'+line.expectedKm.toFixed(3)+' km</div>'+'<div class="result-k">Measured</div><div class="result-v">'+measured+'</div>'+'<div class="result-k">Diff</div><div class="result-v">'+diff+'</div>'+'<div class="result-k">Leg</div><div class="result-v">'+leg+'</div>'+'<div class="result-k">Quality</div><div class="result-v">'+quality+'</div>'+'</div>';wrap.appendChild(div);});}
+function renderStatus(){const ready=gpsReady();const left=Math.max(0,Math.ceil((GPS_READY_MS-(Date.now()-gpsStartedAt))/1000));$("gpsReady").textContent=ready?"Yes":"No";$("gpsReady").className="metric-value "+(ready?"good":"warn");if($("warmupRemaining")){$("warmupRemaining").textContent=ready?"complete":left+" sec";$("warmupRemaining").className="metric-value "+(ready?"good":"warn");}$("startBtn").disabled=!ready||runState==="running";$("startBtn").textContent=ready?(runState==="running"?"Run Active":"Start Run"):"Start Run - GPS warm-up "+left+" sec";$("stopBtn").disabled=runState!=="running";$("liveAccuracy").textContent=lastFix&&Number.isFinite(lastFix.accuracy)?lastFix.accuracy.toFixed(1)+" m":"--";$("liveSpeed").textContent=lastFix&&Number.isFinite(lastFix.speed)?(lastFix.speed*3.6).toFixed(1)+" km/h":"--";$("liveLatLon").textContent=lastFix?lastFix.lat.toFixed(7)+", "+lastFix.lon.toFixed(7):"--";$("nextLine").textContent=nextLineIndex<TEST_LINES.length?TEST_LINES[nextLineIndex].name:"All crossed";$("runDistance").textContent=fmtKm(totalDistanceM);$("crossingCount").textContent=crossings.length+" / "+TEST_LINES.length;$("lastCrossing").textContent=crossings.length?crossings[crossings.length-1].name+" Q"+crossings[crossings.length-1].quality:"--";
+if(crossings.length){const last=crossings[crossings.length-1];$("totalDiff").textContent=last.name+": "+(last.diffM>=0?"+":"")+last.diffM.toFixed(1)+" m";}else $("totalDiff").textContent="--";
+if(!lastFix||nextLineIndex>=TEST_LINES.length){$("nextLineDist").textContent=nextLineIndex>=TEST_LINES.length?"All crossed":"--";}else{$("nextLineDist").textContent=fmtM(lineAbsDistanceM(lastFix,TEST_LINES[nextLineIndex]));}
+}
+function updateGpsStatus(){if(!lastFix){$("gpsStatus").textContent="waiting for GPS";$("gpsStatus").className="metric-value warn";return}const left=Math.max(0,Math.ceil((GPS_READY_MS-(Date.now()-gpsStartedAt))/1000));if(left>0){$("gpsStatus").textContent="warming up "+left+" sec";$("gpsStatus").className="metric-value warn";}else{$("gpsStatus").textContent=runState==="running"?"run active":"GPS ready";$("gpsStatus").className="metric-value good";}}
+
+function startGps(){if(!navigator.geolocation){$("gpsStatus").textContent="GPS not supported";$("gpsStatus").className="metric-value bad";return}gpsStartedAt=Date.now();gpsWatchId=navigator.geolocation.watchPosition(pos=>{const p={lat:pos.coords.latitude,lon:pos.coords.longitude,accuracy:pos.coords.accuracy,speed:pos.coords.speed,time:pos.timestamp||Date.now()};lastFix=p;handleFix(p);updateGpsStatus();renderStatus();},err=>{$("gpsStatus").textContent="GPS error: "+err.message;$("gpsStatus").className="metric-value bad";},{enableHighAccuracy:true,maximumAge:0,timeout:15000});setInterval(()=>{updateGpsStatus();renderStatus();},300)}
+
+function startRun(){if(!gpsReady()){alert("Wait for GPS ready first.");return}runState="running";recordingActive=false;nextLineIndex=0;totalDistanceM=0;lastAnchorDistanceM=0;crossings=[];logRows=[];screenRows=[];lastAccepted=lastFix;addScreen(nowString()+" RUN STARTED - drive before Bluefin line");logRow({type:"RUN",event:"START",time:Date.now(),timestamp:nowString(),lat:lastFix?.lat,lon:lastFix?.lon,accuracy:lastFix?.accuracy,speedKmh:lastFix?.speed?lastFix.speed*3.6:"",decision:"START_RUN",reason:"waiting for first line"});renderLines();renderResultCards();renderStatus()}
+function stopRun(){runState="stopped";addScreen(nowString()+" RUN STOPPED");logRow({type:"RUN",event:"STOP",time:Date.now(),timestamp:nowString(),decision:"STOP_RUN",runningDistanceM:totalDistanceM});renderLines();renderResultCards();renderStatus()}
+function resetRun(){runState="idle";recordingActive=false;nextLineIndex=0;totalDistanceM=0;lastAnchorDistanceM=0;crossings=[];logRows=[];screenRows=[];lastAccepted=lastFix;$("screenLog").textContent="Ready for next run.";renderLines();renderResultCards();renderStatus()}
+
+function classifyPoint(p,segM,dtSec){const acc=Number(p.accuracy);const kmh=dtSec>0?(segM/dtSec)*3.6:0;let decision="ACCEPT",reason="normal";if(Number.isFinite(acc)&&acc>ACC_LOW_M){decision="REJECT";reason="poor GPS >15m"}else if(segM<JITTER_M && (!Number.isFinite(p.speed)||p.speed*3.6<3)){decision="IGNORE";reason="stationary jitter"}else if(kmh>MAX_REASONABLE_KMH){decision="REJECT";reason="unrealistic jump"}else if(Number.isFinite(acc)&&acc>ACC_GOOD_M){decision="ACCEPT_LOW";reason="credible movement, weaker accuracy"}return{decision,reason,kmh};}
+
+function handleFix(p){if(runState!=="running"){return}if(!lastAccepted){lastAccepted=p;return}
+const p1=lastAccepted,p2=p,segM=haversineMeters(p1,p2),dtSec=Math.max(0.001,(p2.time-p1.time)/1000);const cls=classifyPoint(p2,segM,dtSec);
+let rawLine={type:"GPS",event:"FIX",time:p2.time,timestamp:nowString(p2.time),lat:p2.lat,lon:p2.lon,accuracy:p2.accuracy,speedKmh:Number.isFinite(p2.speed)?p2.speed*3.6:"",rawSegmentM:segM,decision:cls.decision,reason:cls.reason,runningDistanceM:totalDistanceM,nextLine:nextLineIndex<TEST_LINES.length?TEST_LINES[nextLineIndex].name:"complete"};
+if(cls.decision==="REJECT"){logRow(rawLine);return}
+if(cls.decision==="IGNORE"){logRow(rawLine);lastAccepted=p2;return}
+const runningBefore=totalDistanceM;
+let crossingHandled=false;
+if(nextLineIndex<TEST_LINES.length){const line=TEST_LINES[nextLineIndex];const d1=lineSignedDistanceM(p1,line),d2=lineSignedDistanceM(p2,line);const proj1=lineProjectionM(p1,line),proj2=lineProjectionM(p2,line);const len=lineLength(line);const nearSegment=(proj1>=-20&&proj1<=len+20)||(proj2>=-20&&proj2<=len+20);
+if(Number.isFinite(d1)&&Number.isFinite(d2)&&d1!==0&&d2!==0&&d1*d2<0&&nearSegment){const frac=Math.abs(d1)/(Math.abs(d1)+Math.abs(d2));const crossMs=p1.time+frac*(p2.time-p1.time);const avgAcc=((Number(p1.accuracy)||0)+(Number(p2.accuracy)||0))/2;const q=crossingQuality(avgAcc,segM,dtSec);let crossDistanceM;
+if(nextLineIndex===0&&!recordingActive){recordingActive=true;crossDistanceM=0;totalDistanceM=(1-frac)*segM;lastAnchorDistanceM=0;}else{crossDistanceM=runningBefore+frac*segM;totalDistanceM=runningBefore+segM;}
+const expectedM=line.expectedKm*1000;const prevExpectedKm=nextLineIndex>0?TEST_LINES[nextLineIndex-1].expectedKm:0;const expectedLegKm=line.expectedKm-prevExpectedKm;const legDistanceM=nextLineIndex===0?0:crossDistanceM-lastAnchorDistanceM;const legDiffM=nextLineIndex===0?0:legDistanceM-expectedLegKm*1000;const diffM=crossDistanceM-expectedM;
+const cr={lineId:line.id,name:line.name,time:crossMs,totalDistanceM:crossDistanceM,expectedM,diffM,legDistanceM,expectedLegKm,legDiffM,quality:q,method:"Method 2",accuracy:avgAcc};crossings.push(cr);
+addScreen(nowString(crossMs)+" CROSS "+line.name+" | "+fmtKm(crossDistanceM)+" | diff "+(diffM>=0?"+":"")+diffM.toFixed(1)+"m | Q"+q);
+logRow({type:"CROSSING",event:"LINE_CROSSED",time:crossMs,timestamp:nowString(crossMs),lineId:line.id,lineName:line.name,method:"Method 2",quality:q,lat:"interpolated",lon:"interpolated",accuracy:avgAcc,rawSegmentM:segM,segmentFraction:frac,runningDistanceM:crossDistanceM,expectedDistanceM:expectedM,differenceM:diffM,legDistanceM,expectedLegM:expectedLegKm*1000,legDifferenceM:legDiffM,decision:"CROSS",reason:"signed side changed"});
+lastAnchorDistanceM=crossDistanceM;nextLineIndex++;crossingHandled=true;
+if(nextLineIndex>=TEST_LINES.length){addScreen(nowString()+" ALL LINES CROSSED - press Stop Run when ready");}
+renderLines();renderResultCards();
+}}
+if(!crossingHandled&&recordingActive){totalDistanceM+=segM;}
+rawLine.runningDistanceM=totalDistanceM;logRow(rawLine);lastAccepted=p2;
+}
+
+function exportCsv(){const header=["type","event","timestamp","time","lat","lon","accuracy","speedKmh","rawSegmentM","decision","reason","runningDistanceM","nextLine","lineId","lineName","method","quality","segmentFraction","expectedDistanceM","differenceM","legDistanceM","expectedLegM","legDifferenceM"];
+const rows=[header.join(",")];logRows.forEach(r=>{rows.push(header.map(h=>escapeCsv(r[h])).join(","))});
+const blob=new Blob([rows.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);const d=new Date();const stamp=String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0")+String(d.getSeconds()).padStart(2,"0");a.download="distances_to_lines_v1_6_"+stamp+".csv";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+
+startBtn.addEventListener("click",startRun);stopBtn.addEventListener("click",stopRun);resetBtn.addEventListener("click",resetRun);exportBtn.addEventListener("click",exportCsv);
+renderLines();renderResultCards();renderStatus();startGps();
+</script>
+</body>
+</html>
